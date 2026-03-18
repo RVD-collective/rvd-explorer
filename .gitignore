@@ -22,8 +22,9 @@ bin/
 /nbdist/
 /.nb-gradle/
 
-### VS Code ###
+### IDEs ###
 .vscode/
+.cursor/
 
 ### Mac OS ###
 .DS_Store
