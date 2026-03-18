@@ -6,6 +6,7 @@ import javafx.scene.image.PixelFormat;
 import javafx.scene.image.WritableImage;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.StrokeLineJoin;
+import rvd.core.DominanceRegionFactory;
 import rvd.io.ExplorerDataCodec;
 import rvd.model.ExplorerSnapshot;
 import rvd.model.ExplorerState;
@@ -138,6 +139,7 @@ public class RVDExplorer implements Drawing {
 
 	RVDColor rvdColorBackground;
 	private final ExplorerDataCodec dataCodec = new ExplorerDataCodec();
+	private final DominanceRegionFactory dominanceRegionFactory = new DominanceRegionFactory();
 	
 	
 	CameraSimple camera = new CameraSimple(F_R_R.cutoff01(t -> F_R_R.power(t, 8)));
@@ -358,18 +360,12 @@ public class RVDExplorer implements Drawing {
 	
 	
 	Figure dominanceFor(int i0, int i1) {
-		Vector p0 = points[i0];
-		Vector p1 = points[i1];
-		double phi = angles[i1] - angles[i0];
-		
-		if (Numeric.mod(phi, 0.5) != 0) {
-			Vector d = p1.sub(p0).div(2);
-			Vector c = p0.add(d.asBase(1, Numeric.tanT(0.25 - phi)));
-			double r = Math.copySign(c.to(p0).length(), 0.5 - Numeric.mod(phi, 1));
-			return Circle.cr(c, r);
-		} else {
-			return phi == 0 ? HalfPlane.pq(p0, p1) : HalfPlane.pq(p1, p0);
-		}
+		return dominanceRegionFactory.create(
+				state.points[i0],
+				state.points[i1],
+				state.angles[i0],
+				state.angles[i1]
+		);
 	}
 
 
