@@ -7,6 +7,7 @@
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
-    <orderEntry type="module" module-name="DrawingFX2" />
+    <orderEntry type="library" name="mars-bits-2026-03-18" level="project" />
+    <orderEntry type="library" name="drawing-fx-2-2022-03-18" level="project" />
   </component>
 </module>

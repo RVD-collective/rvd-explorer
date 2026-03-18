@@ -2,8 +2,6 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/../DrawingFX2/DrawingFX2.iml" filepath="$PROJECT_DIR$/../DrawingFX2/DrawingFX2.iml" />
-      <module fileurl="file://$PROJECT_DIR$/../mars-bits/src/main/mars-bits.main.iml" filepath="$PROJECT_DIR$/../mars-bits/src/main/mars-bits.main.iml" />
       <module fileurl="file://$PROJECT_DIR$/rvd-explorer.iml" filepath="$PROJECT_DIR$/rvd-explorer.iml" />
     </modules>
   </component>
