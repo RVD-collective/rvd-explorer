@@ -8,6 +8,7 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.StrokeLineJoin;
 import rvd.io.ExplorerDataCodec;
 import rvd.model.ExplorerSnapshot;
+import rvd.model.ExplorerState;
 import xyz.marsavic.drawingfx.application.DrawingApplication;
 import xyz.marsavic.drawingfx.application.Options;
 import xyz.marsavic.drawingfx.drawing.Drawing;
@@ -49,13 +50,8 @@ public class RVDExplorer implements Drawing {
 	@Properties(name = "Data String")
 	String dataString = "rO0ABXoAAAHOAAAAAAAAAAAAAAASQE+AAAAAAADANgAAAAAAAD/RI++HH+QVAUA5AAAAAAAAQHPAAAAAAAA/4Pne7C5yLAHARQAAAAAAAEBy8AAAAAAAP+gyHxB0iNkBwD0AAAAAAADAQYAAAAAAAD/TRHIvdh0DAcBgYAAAAAAAQHEAAAAAAAA/4kplNrs9TwHAZ6AAAAAAAEBugAAAAAAAP+j+t2xMBQABwFyAAAAAAADAYOAAAAAAAD/XOrCUFp4CAcBuQAAAAAAAQCwAAAAAAAA/4oc8EYd5zgHAc6AAAAAAAMA5AAAAAAAAP+ru8xZW8P0BwGkgAAAAAADAaOAAAAAAAD/sTJsOBK9AAcBXQAAAAAAAwHJwAAAAAAA/dTFG2BgVNwFAYyAAAAAAAMBx8AAAAAAAP8WHD651nQIBQGkgAAAAAADAaUAAAAAAAD/Jt2jYeCQXAUBy4AAAAAAAQFzAAAAAAAA/2XICjs75hAFAcCAAAAAAAEBigAAAAAAAP+VYCjrljjYBQGNAAAAAAADAQIAAAAAAAD/MrdmdrBhQAUBpgAAAAAAAQHDwAAAAAAA/3G85j2AqXQFAYaAAAAAAAEByYAAAAAAAP+bEe81fa/AB";
 	
-	@GadgetInteger(min = 1, max = maxN)
-	@Properties(name = "Number of sites")
-	int n = 7;
-	
-	@GadgetAnimation(p = 0, q = 1, loop = true, speed = 0.05, start = false)
-	@Properties(name = "Rotate rays")
-	double rotate = 0.0;
+	@RecurseGadgets
+	final ExplorerState state = new ExplorerState(maxN);
 
 	@GadgetDouble
 	@Properties(name = "Max aperture")
@@ -135,11 +131,7 @@ public class RVDExplorer implements Drawing {
 	
 	
 	
-	Vector[] points = new Vector[maxN];
-	double[] angles = new double[maxN];
 	double[] hues = new double[maxN];
-	
-	boolean[] enabled = new boolean[maxN];
 	int kSelected = -1;
 	
 	private Polygon polygon;
@@ -154,40 +146,19 @@ public class RVDExplorer implements Drawing {
 	
 	
 	private String dataAsString() {
-		return dataCodec.encode(snapshot());
+		return dataCodec.encode(state.snapshot());
 	}
 	
 	
 	private void stringToData(String data) {
 		ExplorerSnapshot snapshot = dataCodec.decode(data);
 		if (snapshot != null) {
-			applySnapshot(snapshot);
+			state.applySnapshot(snapshot);
 		}
 	}
 
-	private ExplorerSnapshot snapshot() {
-		Vector[] snapshotPoints = new Vector[n];
-		double[] snapshotAngles = new double[n];
-		boolean[] snapshotEnabled = new boolean[n];
-		for (int k = 0; k < n; k++) {
-			snapshotPoints[k] = points[k];
-			snapshotAngles[k] = angles[k];
-			snapshotEnabled[k] = enabled[k];
-		}
-		return new ExplorerSnapshot(rotate, n, snapshotPoints, snapshotAngles, snapshotEnabled);
-	}
-
-	private void applySnapshot(ExplorerSnapshot snapshot) {
-		rotate = snapshot.rotate();
-		n = snapshot.n();
-		Vector[] snapshotPoints = snapshot.points();
-		double[] snapshotAngles = snapshot.angles();
-		boolean[] snapshotEnabled = snapshot.enabled();
-		for (int k = 0; k < n; k++) {
-			points[k] = snapshotPoints[k];
-			angles[k] = snapshotAngles[k];
-			enabled[k] = snapshotEnabled[k];
-		}
+	ExplorerState explorerState() {
+		return state;
 	}
 	
 	
@@ -196,10 +167,10 @@ public class RVDExplorer implements Drawing {
 		
 		Box box = Box.cr(sizeInitial.div(2));
 		for (int k = 0; k < maxN; k++) {
-			points[k] = sampler.randomInBox(box.scaleFromCenter(2.0/3));
-//			points[k] = sampler.randomGaussian(box.r().min() / 2);
-			angles[k] = sampler.uniform();
-			enabled[k] = true;
+			state.points[k] = sampler.randomInBox(box.scaleFromCenter(2.0/3));
+//			state.points[k] = sampler.randomGaussian(box.r().min() / 2);
+			state.angles[k] = sampler.uniform();
+			state.enabled[k] = true;
 			hues[k] = 360 * k * Numeric.PHI;
 		}
 	}
@@ -253,13 +224,13 @@ public class RVDExplorer implements Drawing {
 		if (ia.i == -2) return rvdColorBackground;
 		if (ia.i == -3) return rvdColorBackground;
 		double b = showShading ? 0.9 - 0.6 * ia.a : 1.0;
-		if (visibilityCellsShadingCount) b *= (double) ia.nVisible / n;
+		if (visibilityCellsShadingCount) b *= (double) ia.nVisible / state.n;
 		return showColor ? colorsDiagram[ia.i].mul(b) : new RVDColor(b);
 	}
 	
 	
 	private boolean visibleThroughThePolygon(Vector p, int k) {
-		LineSegment ab = LineSegment.pq(points[k], p);
+		LineSegment ab = LineSegment.pq(state.points[k], p);
 		
 		if (!showPolygonExterior) {
 			if (ab.d().angleBetween(polygon.e(k-1).d().inverse(), polygon.e(k).d())) {
@@ -269,11 +240,11 @@ public class RVDExplorer implements Drawing {
 //			if (polygon.e(k  ).distance(p) < 0.1) return false;
 		}
 		
-		for (int i = 0; i < n; i++) {
-			if ((i == k) || ((i + 1) % n == k)) {
+		for (int i = 0; i < state.n; i++) {
+			if ((i == k) || ((i + 1) % state.n == k)) {
 				continue;
 			}
-			LineSegment edge = LineSegment.pq(points[i], points[(i + 1) % n]);
+			LineSegment edge = LineSegment.pq(state.points[i], state.points[(i + 1) % state.n]);
 						
 			if (Geometry.intersecting(ab, edge)) {
 				return false;
@@ -284,8 +255,8 @@ public class RVDExplorer implements Drawing {
 	
 	
 	private int[] visibleVertices(Vector p) {
-		ArrayInts vs = new ArrayInts(n);
-		for (int k = 0; k < n; k++) {
+		ArrayInts vs = new ArrayInts(state.n);
+		for (int k = 0; k < state.n; k++) {
 			if (!polygonMode || visibleThroughThePolygon(p, k)) {
 				vs.add(k);
 			}
@@ -329,7 +300,7 @@ public class RVDExplorer implements Drawing {
 		int[] vis = visibleVertices(p);
 		
 		for (int k : vis) {
-			if (enabled[k]) {
+			if (state.enabled[k]) {
 				Vector o = p.sub(rays[k].p());
 				Vector e = rays[k].d();
 				Vector r = Vector.xy(e.dot(o), e.cross(o));
@@ -368,20 +339,20 @@ public class RVDExplorer implements Drawing {
 	
 	private PointResult findDDCell(Vector p, Figure[][] dominances) {
 		int k = 0;
-		while (!enabled[k]) {
+		while (!state.enabled[k]) {
 			k++;
 		}
 		int i = k + 1;
 		
-		while ((k < n) && (i < k + n)) {
-			final int j = i % n;
-			if (enabled[j] && dominances[j][k].contains(p)) {
+		while ((k < state.n) && (i < k + state.n)) {
+			final int j = i % state.n;
+			if (state.enabled[j] && dominances[j][k].contains(p)) {
 				k = i;
 			}
 			i++;
 		}
 		
-		return new PointResult(k < n ? k : -1, 0, 0.0);
+		return new PointResult(k < state.n ? k : -1, 0, 0.0);
 //		return new IndexAngle(dominances[0][1].contains(p) ? 0 : -1, 0);
 	}
 	
@@ -447,21 +418,21 @@ public class RVDExplorer implements Drawing {
 		}
 		
 		if (polygonMode) {
-			for (int i = 0; i < n; i++) {
-				angles[i] = points[(i + 1) % n].sub(points[i]).angle();
+			for (int i = 0; i < state.n; i++) {
+				state.angles[i] = state.points[(i + 1) % state.n].sub(state.points[i]).angle();
 			}
 
-			polygon = Polygon.of(points, n);
+			polygon = Polygon.of(state.points, state.n);
 		}
 		
-		Ray[] rays = new Ray[n];
-		for (int i = 0; i < n; i++) {
-			rays[i] = Ray.pa(points[i], angles[i] + rotate);
+		Ray[] rays = new Ray[state.n];
+		for (int i = 0; i < state.n; i++) {
+			rays[i] = Ray.pa(state.points[i], state.angles[i] + state.rotate);
 		}
 		
-		Figure[][] dominanceRegion = new Figure[n][n];
-		for (int i0 = 0; i0 < n; i0++) {
-			for (int i1 = 0; i1 < n; i1++) {
+		Figure[][] dominanceRegion = new Figure[state.n][state.n];
+		for (int i0 = 0; i0 < state.n; i0++) {
+			for (int i1 = 0; i1 < state.n; i1++) {
 				dominanceRegion[i0][i1] = dominanceFor(i0, i1);
 			}
 		}
@@ -585,9 +556,9 @@ public class RVDExplorer implements Drawing {
 	private void drawRays(View view) {
 		view.setLineWidth(strokeWidth * pixelWidth);
 		
-		for (int k = 0; k < n; k++) {
-			Ray ray = Ray.pd(points[k], Vector.polar(angles[k] + rotate));
-			view.setStroke(colorStrokeRay(k, enabled[k], k == kSelected));
+		for (int k = 0; k < state.n; k++) {
+			Ray ray = Ray.pd(state.points[k], Vector.polar(state.angles[k] + state.rotate));
+			view.setStroke(colorStrokeRay(k, state.enabled[k], k == kSelected));
 			view.strokeRay(ray);
 		}
 	}
@@ -599,9 +570,9 @@ public class RVDExplorer implements Drawing {
 		}
 /*
 		System.out.println("RVDExplorer.drawBrocardPoint:581 " + pBrocard[0]);
-		Ray[] rays = new Ray[n];
-		for (int i = 0; i < n; i++) {
-			rays[i] = Ray.pa(points[i], angles[i] + rotate);
+		Ray[] rays = new Ray[state.n];
+		for (int i = 0; i < state.n; i++) {
+			rays[i] = Ray.pa(state.points[i], state.angles[i] + state.rotate);
 		}
 		findNearest(pBrocard[0], rays);
 */
@@ -627,7 +598,7 @@ public class RVDExplorer implements Drawing {
 		view.setLineWidth(strokeWidth * pixelWidth / 2);
 		view.setStroke(Color.gray(0, 0.5));
 		
-		for (int iq = 0; iq < n; iq++) {
+		for (int iq = 0; iq < state.n; iq++) {
 			Vector q = polygon.v(iq);
 			Vector pq = polygon.e(iq-1).d();
 			Vector qr = polygon.e(iq).d();
@@ -636,7 +607,7 @@ public class RVDExplorer implements Drawing {
 			}
 			// reflex vertex
 			
-			for (int io = 0; io < n; io++) {
+			for (int io = 0; io < state.n; io++) {
 				if (io != iq) {
 					Vector o = polygon.v(io);
 					Line loq = Line.pq(o, q);
@@ -668,12 +639,12 @@ public class RVDExplorer implements Drawing {
 	private void drawPoints(View view) {
 		view.setLineWidth(strokeWidth * pixelWidth);
 		
-		for (int k = 0; k < n; k++) {
-			view.setFill(colorFill(k, enabled[k]));
-			view.fillCircleCentered(points[k], rPoint * pixelWidth);
+		for (int k = 0; k < state.n; k++) {
+			view.setFill(colorFill(k, state.enabled[k]));
+			view.fillCircleCentered(state.points[k], rPoint * pixelWidth);
 			
-			view.setStroke(colorStroke(k, enabled[k], k == kSelected));
-			view.strokeCircleCentered(points[k], rPoint * pixelWidth);
+			view.setStroke(colorStroke(k, state.enabled[k], k == kSelected));
+			view.strokeCircleCentered(state.points[k], rPoint * pixelWidth);
 		}
 	}
 	
@@ -689,19 +660,19 @@ public class RVDExplorer implements Drawing {
 		
 		if (kSelected == -1) {
 			view.setStroke(Color.gray(1, 0.25));
-			for (int i0 = 0; i0 < n; i0++) {
-				if (enabled[i0]) {
+			for (int i0 = 0; i0 < state.n; i0++) {
+				if (state.enabled[i0]) {
 					for (int i1 = 0; i1 < i0; i1++) {
-						if (enabled[i1]) {
+						if (state.enabled[i1]) {
 							stroke(view, dominanceFor(i0, i1));
 						}
 					}
 				}
 			}
 		} else {
-			if (enabled[kSelected]) {
-				for (int i = 0; i < n; i++) {
-					if (i != kSelected && enabled[i]) {
+			if (state.enabled[kSelected]) {
+				for (int i = 0; i < state.n; i++) {
+					if (i != kSelected && state.enabled[i]) {
 						view.setStroke(colorStrokeRay(i, true, false));
 						stroke(view, dominanceFor(i, kSelected));
 					}
@@ -802,8 +773,8 @@ public class RVDExplorer implements Drawing {
 		int bestK = -1;
 		double bestD = Double.POSITIVE_INFINITY;
 		
-		for (int k = 0; k < n; k++) {
-			double d = p.distanceTo(points[k]);
+		for (int k = 0; k < state.n; k++) {
+			double d = p.distanceTo(state.points[k]);
 			if (d < bestD && d < rLimit) {
 				bestK = k;
 				bestD = d;
@@ -855,27 +826,27 @@ public class RVDExplorer implements Drawing {
 		}
 		
 		if (dragging && kSelected >= 0) {
-			points[kSelected] = p;
+			this.state.points[kSelected] = p;
 			diagramChanged = true;
 		}
 		
 		if (state.mouseButtonPressed(3) && kSelected >= 0) {
-			Vector d = p.sub(points[kSelected]);
-			angles[kSelected] = d.angle() - rotate;
+			Vector d = p.sub(this.state.points[kSelected]);
+			this.state.angles[kSelected] = d.angle() - this.state.rotate;
 			diagramChanged = true;
 		}
 		
 		if (event.isKeyPress(KeyCode.E)) {
 			int k = nearestK(pointerWorld, mouseReach * pixelWidth);
 			if (k >= 0) {
-				enabled[k] ^= true;
+				this.state.enabled[k] ^= true;
 				diagramChanged = true;
 			}
 		}
 		
 		if (event.isKeyPress(KeyCode.N)) {
-			for (int i = 0; i < n; i++) {
-				points[i] = Vector.polar(i % 2 == 0 ? 350 : 150, 1.0 * i / n);
+			for (int i = 0; i < this.state.n; i++) {
+				this.state.points[i] = Vector.polar(i % 2 == 0 ? 350 : 150, 1.0 * i / this.state.n);
 			}
 			diagramChanged = true;
 		}
