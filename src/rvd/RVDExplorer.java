@@ -10,6 +10,7 @@ import rvd.core.PolygonVisibility;
 import rvd.io.ExplorerDataCodec;
 import rvd.model.ExplorerSnapshot;
 import rvd.model.ExplorerState;
+import rvd.render.BrocardTracker;
 import rvd.render.DiagramFrameCoordinator;
 import rvd.render.HelpOverlayDrawer;
 import rvd.render.OverlayDrawer;
@@ -142,6 +143,7 @@ public class RVDExplorer implements Drawing {
 	private final NearestCellClassifier nearestCellClassifier = new NearestCellClassifier();
 	private final PolygonVisibility polygonVisibility = new PolygonVisibility();
 	private final DiagramPreparation diagramPreparation = new DiagramPreparation();
+	private final BrocardTracker brocardTracker = new BrocardTracker();
 	private final DiagramFrameCoordinator diagramFrameCoordinator = new DiagramFrameCoordinator();
 	private final HelpOverlayDrawer helpOverlayDrawer = new HelpOverlayDrawer();
 	private final OverlayDrawer overlayDrawer = new OverlayDrawer();
@@ -291,26 +293,14 @@ public class RVDExplorer implements Drawing {
 	}
 */
 
-
-	final Vector[] pBrocard = { null }; // terribly hacky and not thread-safe due to lack of time
-	final double[] aBrocard = { 0.0 };  // same
-
 	private void resetBrocardSearch() {
-		aBrocard[0] = 0.0;
-		pBrocard[0] = null;
+		brocardTracker.reset();
 	}
 
 	private PointResult classifyPoint(Vector p, Figure[][] dominanceRegion, Ray[] rays) {
 		return (diagram == DiagramType.DISK_DIAGRAM)
 				? findDDCell(p, dominanceRegion)
 				: findNearest(p, rays);
-	}
-
-	private void updateBrocardIfBetter(PointResult ia, Vector p) {
-		if (ia.i >= -2 && ia.a() > aBrocard[0]) {
-			aBrocard[0] = ia.a();
-			pBrocard[0] = p;
-		}
 	}
 
 	/**
@@ -351,14 +341,7 @@ public class RVDExplorer implements Drawing {
 						classification.visibleCount(),
 						classification.angle()
 				)),
-				(classification, p) -> updateBrocardIfBetter(
-						new PointResult(
-								classification.index(),
-								classification.visibleCount(),
-								classification.angle()
-						),
-						p
-				)
+				(classification, p) -> brocardTracker.observe(classification.index(), classification.angle(), p)
 		);
 	}
 
@@ -400,7 +383,7 @@ public class RVDExplorer implements Drawing {
 		);
 
 		if (showDiagram        ) diagramFrameCoordinator.drawDiagram(view, this::makeImage);
-		if (showBrocardPoint   ) overlayDrawer.drawBrocardPoint(view, pBrocard[0], overlayContext);
+		if (showBrocardPoint   ) overlayDrawer.drawBrocardPoint(view, brocardTracker.point(), overlayContext);
 		if (polygonMode        ) overlayDrawer.drawPolygon(view, overlayContext);
 		if (showVisibilityCells) overlayDrawer.drawVisibilityCells(view, overlayContext);
 		if (showCircles        ) overlayDrawer.drawCircles(view, overlayContext, this::dominanceFor);
