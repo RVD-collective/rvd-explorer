@@ -1,11 +1,7 @@
 package rvd;
 
 import javafx.scene.image.Image;
-import javafx.scene.image.PixelBuffer;
-import javafx.scene.image.PixelFormat;
-import javafx.scene.image.WritableImage;
 import javafx.scene.paint.Color;
-import javafx.scene.shape.StrokeLineJoin;
 import rvd.core.DiagramPreparation;
 import rvd.core.DominanceRegionFactory;
 import rvd.core.DiskCellSelector;
@@ -14,6 +10,8 @@ import rvd.core.PolygonVisibility;
 import rvd.io.ExplorerDataCodec;
 import rvd.model.ExplorerSnapshot;
 import rvd.model.ExplorerState;
+import rvd.render.OverlayDrawer;
+import rvd.render.RasterDiagramRenderer;
 import xyz.marsavic.drawingfx.application.DrawingApplication;
 import xyz.marsavic.drawingfx.application.Options;
 import xyz.marsavic.drawingfx.drawing.Drawing;
@@ -29,10 +27,6 @@ import xyz.marsavic.input.KeyCode;
 import xyz.marsavic.random.sampling.Sampler;
 import xyz.marsavic.utils.Hash;
 import xyz.marsavic.utils.Numeric;
-
-import java.nio.IntBuffer;
-import java.util.stream.IntStream;
-
 
 enum DiagramType {
 	RVD_RAYS_ORIENTED, RVD_RAYS_UNORIENTED, RVD_LINES, DISK_DIAGRAM
@@ -146,6 +140,8 @@ public class RVDExplorer implements Drawing {
 	private final NearestCellClassifier nearestCellClassifier = new NearestCellClassifier();
 	private final PolygonVisibility polygonVisibility = new PolygonVisibility();
 	private final DiagramPreparation diagramPreparation = new DiagramPreparation();
+	private final OverlayDrawer overlayDrawer = new OverlayDrawer();
+	private final RasterDiagramRenderer rasterDiagramRenderer = new RasterDiagramRenderer();
 
 
 	CameraSimple camera = new CameraSimple(F_R_R.cutoff01(t -> F_R_R.power(t, 8)));
@@ -190,34 +186,6 @@ public class RVDExplorer implements Drawing {
 	private double hue(int k) {
 		return 360 * k * Numeric.PHI;
 	}
-
-	private Color colorStroke(int k, boolean enabled, boolean selected) {
-		return Color.hsb(
-				hues[k],
-				selected ? 0.0 : 1.0,
-				selected ? 1.0 : 0.0,
-				enabled ? 1.0 : 0.4
-		);
-	}
-
-	private Color colorStrokeRay(int k, boolean enabled, boolean selected) {
-		return Color.hsb(
-				hues[k],
-				selected ? 0.2 : 0.8,
-				selected ? 1.0 : 0.6,
-				enabled ? 1.0 : 0.4
-		);
-	}
-
-	private Color colorFill(int k, boolean enabled) {
-		return Color.hsb(
-				hues[k],
-				0.7,
-				1.0,
-				enabled ? 1.0 : 0.0
-		);
-	}
-
 
 	RVDColor[] colorsDiagram = new RVDColor[maxN];
 	{
@@ -323,26 +291,6 @@ public class RVDExplorer implements Drawing {
 	final Vector[] pBrocard = { null }; // terribly hacky and not thread-safe due to lack of time
 	final double[] aBrocard = { 0.0 };  // same
 
-	private static final int nBits = 3;
-	private static final int nValues = 1 << nBits;
-
-	int[] pixels;
-	int sizeYp = 0, sizeXp = 0;
-	byte[][] bestI;
-	byte[][] bestDepth;
-	float[][] bestA;
-
-	private void ensureBuffers(int sizeX, int sizeY) {
-		if ((sizeYp < sizeY) || (sizeXp < sizeX)) {
-			sizeYp = sizeY;
-			sizeXp = sizeX;
-			bestI = new byte[sizeY][sizeX];
-			bestDepth = new byte[sizeY][sizeX];
-			bestA = new float[sizeY][sizeX];
-			pixels = new int[sizeY * sizeX];
-		}
-	}
-
 	private void resetBrocardSearch() {
 		aBrocard[0] = 0.0;
 		pBrocard[0] = null;
@@ -361,96 +309,12 @@ public class RVDExplorer implements Drawing {
 		}
 	}
 
-	private void computeNearestPass(
-			Transformation tFromPixels,
-			int sizeX,
-			int sizeY,
-			Figure[][] dominanceRegion,
-			Ray[] rays
-	) {
-		IntStream.range(0, sizeY).parallel().forEach(y -> {
-			for (int x = 0; x < sizeX; x++) {
-				Vector cPixel = Vector.xy(x + 0.5, y + 0.5);
-				Vector p = tFromPixels.applyTo(cPixel);
-				PointResult ia = classifyPoint(p, dominanceRegion, rays);
-				bestI[y][x] = (byte) ia.i;
-				bestDepth[y][x] = (byte) ia.nVisible;
-				bestA[y][x] = (float) ia.a;
-				updateBrocardIfBetter(ia, p);
-			}
-		});
-	}
-
-	private void computeAntialiasPass(
-			Transformation tFromPixels,
-			int sizeX,
-			int sizeY,
-			Figure[][] dominanceRegion,
-			Ray[] rays
-	) {
-		IntStream.range(0, sizeY).parallel().forEach(y -> {
-			for (int x = 0; x < sizeX; x++) {
-				int bI = bestI[y][x];
-
-				boolean shouldAntialias = false;
-				if ((x > 0      ) && (bI != bestI[y][x-1])) shouldAntialias = true;
-				if ((x < sizeX-1) && (bI != bestI[y][x+1])) shouldAntialias = true;
-				if ((y > 0      ) && (bI != bestI[y-1][x])) shouldAntialias = true;
-				if ((y < sizeY-1) && (bI != bestI[y+1][x])) shouldAntialias = true;
-
-				RVDColor color;
-
-				if (!shouldAntialias) {
-					color = colorDiagram(new PointResult(bI, bestDepth[y][x], bestA[y][x]));
-				} else {
-					RVDColor sum = new RVDColor();
-
-					for (int idx = 0; idx < nValues; idx++) {
-						int idy = Integer.reverse(idx) >>> (32 - nBits); // No need to optimize
-
-						Vector cPixel = Vector.xy(x + (idx + 0.5) / nValues, y + (idy + 0.5) / nValues);
-						Vector p = tFromPixels.applyTo(cPixel);
-						PointResult ia = classifyPoint(p, dominanceRegion, rays);
-
-						sum = sum.add(colorDiagram(ia));
-
-						updateBrocardIfBetter(ia, p);
-					}
-
-					color = sum.mul(1.0 / nValues);
-				}
-
-				pixels[y * sizeX + x] = color.code();
-			}
-		});
-	}
-
-	private boolean isEmptyImage(int sizeX, int sizeY) {
-		return sizeX == 0 || sizeY == 0;
-	}
-
-	private Image buildWritableImage(int sizeX, int sizeY) {
-		PixelFormat<IntBuffer> pixelFormat = PixelFormat.getIntArgbPreInstance();
-		IntBuffer buffer = IntBuffer.wrap(pixels);
-		PixelBuffer<IntBuffer> pixelBuffer = new PixelBuffer<>(sizeX, sizeY, buffer, pixelFormat);
-		pixelBuffer.updateBuffer(pb -> null);
-		return new WritableImage(pixelBuffer);
-	}
-
 	/**
 	 * @param tFromPixels  A transformation from the pixel space to the working space
 	 * @param bImage  An integer box in the pixel space used to make the resulting image
 	 * @return ...
 	 */
 	private Image makeImage(Transformation tFromPixels, Box bImage) {
-		Vector diag = bImage.d().abs();
-		int sizeX = diag.xInt();
-		int sizeY = diag.yInt();
-
-		if (isEmptyImage(sizeX, sizeY)) {
-			return null;
-		}
-
 		DiagramPreparation.PreparedData prepared = diagramPreparation.prepare(
 				state.points,
 				state.angles,
@@ -463,19 +327,28 @@ public class RVDExplorer implements Drawing {
 		Ray[] rays = prepared.rays();
 		Figure[][] dominanceRegion = prepared.dominanceRegion();
 
-		ensureBuffers(sizeX, sizeY);
-
 		resetBrocardSearch();
-
-
-		// Finding nearest
-		computeNearestPass(tFromPixels, sizeX, sizeY, dominanceRegion, rays);
-
-		// Antialiasing
-		computeAntialiasPass(tFromPixels, sizeX, sizeY, dominanceRegion, rays);
-
-
-		return buildWritableImage(sizeX, sizeY);
+		return rasterDiagramRenderer.render(
+				tFromPixels,
+				bImage,
+				p -> {
+					PointResult ia = classifyPoint(p, dominanceRegion, rays);
+					return new RasterDiagramRenderer.Classification(ia.i, ia.nVisible, ia.a);
+				},
+				classification -> colorDiagram(new PointResult(
+						classification.index(),
+						classification.visibleCount(),
+						classification.angle()
+				)),
+				(classification, p) -> updateBrocardIfBetter(
+						new PointResult(
+								classification.index(),
+								classification.visibleCount(),
+								classification.angle()
+						),
+						p
+				)
+		);
 	}
 
 
@@ -508,135 +381,6 @@ public class RVDExplorer implements Drawing {
 		view.setTransformation(Transformation.IDENTITY);
 		view.drawImage(b, imgDiagram);
 		view.setTransformation(t);
-	}
-
-
-	private void drawRays(View view) {
-		view.setLineWidth(strokeWidth * pixelWidth);
-
-		for (int k = 0; k < state.n; k++) {
-			Ray ray = Ray.pd(state.points[k], Vector.polar(state.angles[k] + state.rotate));
-			view.setStroke(colorStrokeRay(k, state.enabled[k], k == kSelected));
-			view.strokeRay(ray);
-		}
-	}
-
-
-	private void drawBrocardPoint(View view) {
-		if (pBrocard[0] == null) {
-			return;
-		}
-/*
-		System.out.println("RVDExplorer.drawBrocardPoint:581 " + pBrocard[0]);
-		Ray[] rays = new Ray[state.n];
-		for (int i = 0; i < state.n; i++) {
-			rays[i] = Ray.pa(state.points[i], state.angles[i] + state.rotate);
-		}
-		findNearest(pBrocard[0], rays);
-*/
-
-//		view.setLineWidth(strokeWidth * pixelWidth);
-
-		view.setFill(Color.WHITE);
-		view.fillCircleCentered(pBrocard[0], rPoint * pixelWidth);
-	}
-
-	private void drawPolygon(View view) {
-		if (showDiagramSkeleton) return;
-		view.setLineWidth(strokeWidth * pixelWidth);
-		view.setStroke(Color.BLACK);
-		view.setLineJoin(StrokeLineJoin.ROUND);
-		view.strokePolygon(polygon);
-	}
-
-
-	private void drawVisibilityCells(View view) {
-		if (!polygonMode) return;
-
-		view.setLineWidth(strokeWidth * pixelWidth / 2);
-		view.setStroke(Color.gray(0, 0.5));
-
-		for (int iq = 0; iq < state.n; iq++) {
-			Vector q = polygon.v(iq);
-			Vector pq = polygon.e(iq-1).d();
-			Vector qr = polygon.e(iq).d();
-			if (pq.cross(qr) >= 0) {
-				continue;
-			}
-			// reflex vertex
-
-			for (int io = 0; io < state.n; io++) {
-				if (io != iq) {
-					Vector o = polygon.v(io);
-					Line loq = Line.pq(o, q);
-					Vector oq = loq.d();
-
-					if (!oq.sameSide(pq, qr)) {
-						double t = polygon.intersectionTimeFirst(loq, 0.000001);
-						if (t >= 0.999999) {
-							t = polygon.intersectionTimeFirst(loq, 1.000001);
-							view.strokeLineSegment(loq.segment(Interval.pq(1, t)));
-						}
-					}
-
-/*
-					if (!oq.sameSide(pq, qr)) {
-						double k = polygon.intersectionSideFirst(loq, 0);
-						if ((k == iq) || (((k + 1) % polygon.size()) == iq)) {
-							double t = polygon.intersectionTimeFirst(loq, 1);
-							view.strokeLineSegment(loq.segment(Interval.pq(1, t)));
-						}
-					}
-*/
-				}
-			}
-		}
-	}
-
-
-	private void drawPoints(View view) {
-		view.setLineWidth(strokeWidth * pixelWidth);
-
-		for (int k = 0; k < state.n; k++) {
-			view.setFill(colorFill(k, state.enabled[k]));
-			view.fillCircleCentered(state.points[k], rPoint * pixelWidth);
-
-			view.setStroke(colorStroke(k, state.enabled[k], k == kSelected));
-			view.strokeCircleCentered(state.points[k], rPoint * pixelWidth);
-		}
-	}
-
-
-	private void stroke(View view, Figure f) {
-		if (f instanceof Circle   ) view.strokeCircle   ((Circle   ) f);
-		if (f instanceof HalfPlane) view.strokeHalfPlane((HalfPlane) f);
-	}
-
-
-	private void drawCircles(View view) {
-		view.setLineWidth(pixelWidth);
-
-		if (kSelected == -1) {
-			view.setStroke(Color.gray(1, 0.25));
-			for (int i0 = 0; i0 < state.n; i0++) {
-				if (state.enabled[i0]) {
-					for (int i1 = 0; i1 < i0; i1++) {
-						if (state.enabled[i1]) {
-							stroke(view, dominanceFor(i0, i1));
-						}
-					}
-				}
-			}
-		} else {
-			if (state.enabled[kSelected]) {
-				for (int i = 0; i < state.n; i++) {
-					if (i != kSelected && state.enabled[i]) {
-						view.setStroke(colorStrokeRay(i, true, false));
-						stroke(view, dominanceFor(i, kSelected));
-					}
-				}
-			}
-		}
 	}
 
 
@@ -704,12 +448,12 @@ public class RVDExplorer implements Drawing {
 
 	private void drawVisibleLayers(View view) {
 		if (showDiagram        ) drawDiagram(view, diagramChanged);
-		if (showBrocardPoint   ) drawBrocardPoint(view);
-		if (polygonMode        ) drawPolygon(view);
-		if (showVisibilityCells) drawVisibilityCells(view);
-		if (showCircles        ) drawCircles(view);
-		if (showRays           ) drawRays(view);
-		if (showPoints         ) drawPoints(view);
+		if (showBrocardPoint   ) overlayDrawer.drawBrocardPoint(view, pBrocard[0], pixelWidth, rPoint);
+		if (polygonMode        ) overlayDrawer.drawPolygon(view, polygon, showDiagramSkeleton, pixelWidth, strokeWidth);
+		if (showVisibilityCells) overlayDrawer.drawVisibilityCells(view, polygon, polygonMode, state.n, pixelWidth, strokeWidth);
+		if (showCircles        ) overlayDrawer.drawCircles(view, state, hues, kSelected, pixelWidth, this::dominanceFor);
+		if (showRays           ) overlayDrawer.drawRays(view, state, hues, kSelected, pixelWidth, strokeWidth);
+		if (showPoints         ) overlayDrawer.drawPoints(view, state, hues, kSelected, pixelWidth, strokeWidth, rPoint);
 		if (showHelp           ) showHelp(view);
 	}
 
