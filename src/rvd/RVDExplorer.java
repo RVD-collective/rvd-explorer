@@ -418,13 +418,25 @@ public class RVDExplorer implements Drawing {
 	}
 
 	private void drawVisibleLayers(View view) {
+		OverlayDrawer.Context overlayContext = new OverlayDrawer.Context(
+				state,
+				hues,
+				kSelected,
+				polygon,
+				polygonMode,
+				showDiagramSkeleton,
+				pixelWidth,
+				strokeWidth,
+				rPoint
+		);
+
 		if (showDiagram        ) diagramFrameCoordinator.drawDiagram(view, this::makeImage);
-		if (showBrocardPoint   ) overlayDrawer.drawBrocardPoint(view, pBrocard[0], pixelWidth, rPoint);
-		if (polygonMode        ) overlayDrawer.drawPolygon(view, polygon, showDiagramSkeleton, pixelWidth, strokeWidth);
-		if (showVisibilityCells) overlayDrawer.drawVisibilityCells(view, polygon, polygonMode, state.n, pixelWidth, strokeWidth);
-		if (showCircles        ) overlayDrawer.drawCircles(view, state, hues, kSelected, pixelWidth, this::dominanceFor);
-		if (showRays           ) overlayDrawer.drawRays(view, state, hues, kSelected, pixelWidth, strokeWidth);
-		if (showPoints         ) overlayDrawer.drawPoints(view, state, hues, kSelected, pixelWidth, strokeWidth, rPoint);
+		if (showBrocardPoint   ) overlayDrawer.drawBrocardPoint(view, pBrocard[0], overlayContext);
+		if (polygonMode        ) overlayDrawer.drawPolygon(view, overlayContext);
+		if (showVisibilityCells) overlayDrawer.drawVisibilityCells(view, overlayContext);
+		if (showCircles        ) overlayDrawer.drawCircles(view, overlayContext, this::dominanceFor);
+		if (showRays           ) overlayDrawer.drawRays(view, overlayContext);
+		if (showPoints         ) overlayDrawer.drawPoints(view, overlayContext);
 		if (showHelp           ) showHelp(view);
 	}
 

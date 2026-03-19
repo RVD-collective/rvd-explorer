@@ -18,63 +18,58 @@ import java.util.function.BiFunction;
 
 public class OverlayDrawer {
 
-    public void drawRays(
-            View view,
+    public record Context(
             ExplorerState state,
             double[] hues,
-            int kSelected,
+            int selectedIndex,
+            Polygon polygon,
+            boolean polygonMode,
+            boolean showDiagramSkeleton,
             double pixelWidth,
-            double strokeWidth
-    ) {
-        view.setLineWidth(strokeWidth * pixelWidth);
+            double strokeWidth,
+            double pointRadius
+    ) {}
+
+    public void drawRays(View view, Context context) {
+        ExplorerState state = context.state();
+        view.setLineWidth(context.strokeWidth() * context.pixelWidth());
 
         for (int k = 0; k < state.n; k++) {
             Ray ray = Ray.pd(state.points[k], Vector.polar(state.angles[k] + state.rotate));
-            view.setStroke(colorStrokeRay(hues, k, state.enabled[k], k == kSelected));
+            view.setStroke(colorStrokeRay(context.hues(), k, state.enabled[k], k == context.selectedIndex()));
             view.strokeRay(ray);
         }
     }
 
-    public void drawBrocardPoint(View view, Vector brocardPoint, double pixelWidth, double pointRadius) {
+    public void drawBrocardPoint(View view, Vector brocardPoint, Context context) {
         if (brocardPoint == null) {
             return;
         }
         view.setFill(Color.WHITE);
-        view.fillCircleCentered(brocardPoint, pointRadius * pixelWidth);
+        view.fillCircleCentered(brocardPoint, context.pointRadius() * context.pixelWidth());
     }
 
-    public void drawPolygon(
-            View view,
-            Polygon polygon,
-            boolean showDiagramSkeleton,
-            double pixelWidth,
-            double strokeWidth
-    ) {
-        if (showDiagramSkeleton || polygon == null) {
+    public void drawPolygon(View view, Context context) {
+        Polygon polygon = context.polygon();
+        if (context.showDiagramSkeleton() || polygon == null) {
             return;
         }
-        view.setLineWidth(strokeWidth * pixelWidth);
+        view.setLineWidth(context.strokeWidth() * context.pixelWidth());
         view.setStroke(Color.BLACK);
         view.setLineJoin(StrokeLineJoin.ROUND);
         view.strokePolygon(polygon);
     }
 
-    public void drawVisibilityCells(
-            View view,
-            Polygon polygon,
-            boolean polygonMode,
-            int n,
-            double pixelWidth,
-            double strokeWidth
-    ) {
-        if (!polygonMode || polygon == null) {
+    public void drawVisibilityCells(View view, Context context) {
+        Polygon polygon = context.polygon();
+        if (!context.polygonMode() || polygon == null) {
             return;
         }
 
-        view.setLineWidth(strokeWidth * pixelWidth / 2);
+        view.setLineWidth(context.strokeWidth() * context.pixelWidth() / 2);
         view.setStroke(Color.gray(0, 0.5));
 
-        for (int iq = 0; iq < n; iq++) {
+        for (int iq = 0; iq < context.state().n; iq++) {
             Vector q = polygon.v(iq);
             Vector pq = polygon.e(iq - 1).d();
             Vector qr = polygon.e(iq).d();
@@ -82,7 +77,7 @@ public class OverlayDrawer {
                 continue;
             }
 
-            for (int io = 0; io < n; io++) {
+            for (int io = 0; io < context.state().n; io++) {
                 if (io == iq) {
                     continue;
                 }
@@ -101,35 +96,27 @@ public class OverlayDrawer {
         }
     }
 
-    public void drawPoints(
-            View view,
-            ExplorerState state,
-            double[] hues,
-            int kSelected,
-            double pixelWidth,
-            double strokeWidth,
-            double pointRadius
-    ) {
-        view.setLineWidth(strokeWidth * pixelWidth);
+    public void drawPoints(View view, Context context) {
+        ExplorerState state = context.state();
+        view.setLineWidth(context.strokeWidth() * context.pixelWidth());
 
         for (int k = 0; k < state.n; k++) {
-            view.setFill(colorFill(hues, k, state.enabled[k]));
-            view.fillCircleCentered(state.points[k], pointRadius * pixelWidth);
+            view.setFill(colorFill(context.hues(), k, state.enabled[k]));
+            view.fillCircleCentered(state.points[k], context.pointRadius() * context.pixelWidth());
 
-            view.setStroke(colorStroke(hues, k, state.enabled[k], k == kSelected));
-            view.strokeCircleCentered(state.points[k], pointRadius * pixelWidth);
+            view.setStroke(colorStroke(context.hues(), k, state.enabled[k], k == context.selectedIndex()));
+            view.strokeCircleCentered(state.points[k], context.pointRadius() * context.pixelWidth());
         }
     }
 
     public void drawCircles(
             View view,
-            ExplorerState state,
-            double[] hues,
-            int kSelected,
-            double pixelWidth,
+            Context context,
             BiFunction<Integer, Integer, Figure> dominanceProvider
     ) {
-        view.setLineWidth(pixelWidth);
+        ExplorerState state = context.state();
+        int kSelected = context.selectedIndex();
+        view.setLineWidth(context.pixelWidth());
 
         if (kSelected == -1) {
             view.setStroke(Color.gray(1, 0.25));
@@ -145,7 +132,7 @@ public class OverlayDrawer {
         } else if (state.enabled[kSelected]) {
             for (int i = 0; i < state.n; i++) {
                 if (i != kSelected && state.enabled[i]) {
-                    view.setStroke(colorStrokeRay(hues, i, true, false));
+                    view.setStroke(colorStrokeRay(context.hues(), i, true, false));
                     stroke(view, dominanceProvider.apply(i, kSelected));
                 }
             }
