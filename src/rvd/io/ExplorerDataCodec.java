@@ -11,7 +11,7 @@ import java.util.Base64;
 
 public class ExplorerDataCodec {
 
-    public String encode(ExplorerSnapshot snapshot) {
+    public static String encode(ExplorerSnapshot snapshot) {
         try (
                 ByteArrayOutputStream outB = new ByteArrayOutputStream();
                 ObjectOutputStream out = new ObjectOutputStream(outB)
@@ -37,7 +37,7 @@ public class ExplorerDataCodec {
         }
     }
 
-    public ExplorerSnapshot decode(String data) {
+    public static ExplorerSnapshot decode(String data) {
         try (
                 ByteArrayInputStream inB = new ByteArrayInputStream(Base64.getDecoder().decode(data));
                 ObjectInputStream in = new ObjectInputStream(inB)

@@ -8,7 +8,7 @@ import xyz.marsavic.utils.Numeric;
 
 public class DominanceRegionFactory {
 
-    public Figure create(Vector p0, Vector p1, double angle0, double angle1) {
+    public static Figure create(Vector p0, Vector p1, double angle0, double angle1) {
         double phi = angle1 - angle0;
 
         if (Numeric.mod(phi, 0.5) != 0) {

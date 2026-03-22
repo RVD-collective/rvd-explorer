@@ -137,16 +137,9 @@ public class RVDExplorer implements Drawing {
 	private Polygon polygon;
 
 	RVDColor rvdColorBackground;
-	private final ExplorerDataCodec dataCodec = new ExplorerDataCodec();
-	private final DominanceRegionFactory dominanceRegionFactory = new DominanceRegionFactory();
-	private final DiskCellSelector diskCellSelector = new DiskCellSelector();
-	private final NearestCellClassifier nearestCellClassifier = new NearestCellClassifier();
-	private final PolygonVisibility polygonVisibility = new PolygonVisibility();
-	private final DiagramPreparation diagramPreparation = new DiagramPreparation();
+	
 	private final BrocardTracker brocardTracker = new BrocardTracker();
 	private final DiagramFrameCoordinator diagramFrameCoordinator = new DiagramFrameCoordinator();
-	private final HelpOverlayDrawer helpOverlayDrawer = new HelpOverlayDrawer();
-	private final OverlayDrawer overlayDrawer = new OverlayDrawer();
 	private final RasterDiagramRenderer rasterDiagramRenderer = new RasterDiagramRenderer();
 
 
@@ -156,19 +149,15 @@ public class RVDExplorer implements Drawing {
 
 
 	private String dataAsString() {
-		return dataCodec.encode(state.snapshot());
+		return ExplorerDataCodec.encode(state.snapshot());
 	}
 
 
 	private void stringToData(String data) {
-		ExplorerSnapshot snapshot = dataCodec.decode(data);
+		ExplorerSnapshot snapshot = ExplorerDataCodec.decode(data);
 		if (snapshot != null) {
 			state.applySnapshot(snapshot);
 		}
-	}
-
-	ExplorerState explorerState() {
-		return state;
 	}
 
 
@@ -236,7 +225,7 @@ public class RVDExplorer implements Drawing {
 	}
 
 	private PointResult findNearest_(Vector p, Ray[] rays) {
-		int[] vis = polygonVisibility.visibleVertices(
+		int[] vis = PolygonVisibility.visibleVertices(
 				p,
 				state.points,
 				state.n,
@@ -245,7 +234,7 @@ public class RVDExplorer implements Drawing {
 				showPolygonExterior
 		);
 
-		NearestCellClassifier.Result nearest = nearestCellClassifier.classify(
+		NearestCellClassifier.Result nearest = NearestCellClassifier.classify(
 				p,
 				rays,
 				state.enabled,
@@ -260,14 +249,14 @@ public class RVDExplorer implements Drawing {
 
 
 	private PointResult findDDCell(Vector p, Figure[][] dominances) {
-		int k = diskCellSelector.select(p, dominances, state.enabled, state.n);
+		int k = DiskCellSelector.select(p, dominances, state.enabled, state.n);
 		return new PointResult(k, 0, 0.0);
 //		return new IndexAngle(dominances[0][1].contains(p) ? 0 : -1, 0);
 	}
 
 
 	Figure dominanceFor(int i0, int i1) {
-		return dominanceRegionFactory.create(
+		return DominanceRegionFactory.create(
 				state.points[i0],
 				state.points[i1],
 				state.angles[i0],
@@ -275,23 +264,6 @@ public class RVDExplorer implements Drawing {
 		);
 	}
 
-
-/*
-	Figure dominanceFor(int i0, int i1) {
-		Vector p0 = points[i0];
-		Vector p1 = points[i1];
-		double phi = angles[i1] - angles[i0];
-
-//		if (Numeric.mod(phi, 1) < 0.5) {
-			Figure c = dominanceDiskFor(i0, i1);
-			Figure r0 = HalfPlane.pq(Vector.ZERO, p0);
-			Figure r1 = HalfPlane.pq(p1, Vector.ZERO);
-			Figure l = HalfPlane.pq	(p0, p1);
-
-			return new SunRegion(c, r0, r1, l);
-
-	}
-*/
 
 	private void resetBrocardSearch() {
 		brocardTracker.reset();
@@ -316,7 +288,7 @@ public class RVDExplorer implements Drawing {
 			return null;
 		}
 
-		DiagramPreparation.PreparedData prepared = diagramPreparation.prepare(
+		DiagramPreparation.PreparedData prepared = DiagramPreparation.prepare(
 				state.points,
 				state.angles,
 				state.n,
@@ -347,20 +319,6 @@ public class RVDExplorer implements Drawing {
 
 
 
-	// Constructs an image covering box b (given in the current view space), and draws it.
-//	private void drawDiagram(View view, Box b) {
-//		Transformation t = view.transformation();
-//		Transformation tInv = t.inverse();
-//		Box bNativeBounding = Box.bounding(t.applyTo(b.corners()));
-//		Box bNativeBoundingInt = Box.UNIT.gridIndices(bNativeBounding);
-//
-//		Image img = makeImage(tInv, bNativeBoundingInt);
-//		view.setTransformation(Transformation.translation(bNativeBoundingInt.p().inversed()));
-//		view.drawImage(bNativeBoundingInt, img);
-//		view.setTransformation(t);
-//	}
-
-
 	private void updateDrawInvalidationState(View view) {
 		diagramFrameCoordinator.updateInvalidationState(view, dataString, this::stringToData);
 	}
@@ -383,13 +341,13 @@ public class RVDExplorer implements Drawing {
 		);
 
 		if (showDiagram        ) diagramFrameCoordinator.drawDiagram(view, this::makeImage);
-		if (showBrocardPoint   ) overlayDrawer.drawBrocardPoint(view, brocardTracker.point(), overlayContext);
-		if (polygonMode        ) overlayDrawer.drawPolygon(view, overlayContext);
-		if (showVisibilityCells) overlayDrawer.drawVisibilityCells(view, overlayContext);
-		if (showCircles        ) overlayDrawer.drawCircles(view, overlayContext, this::dominanceFor);
-		if (showRays           ) overlayDrawer.drawRays(view, overlayContext);
-		if (showPoints         ) overlayDrawer.drawPoints(view, overlayContext);
-		if (showHelp           ) helpOverlayDrawer.draw(view);
+		if (showBrocardPoint   ) OverlayDrawer.drawBrocardPoint(view, brocardTracker.point(), overlayContext);
+		if (polygonMode        ) OverlayDrawer.drawPolygon(view, overlayContext);
+		if (showVisibilityCells) OverlayDrawer.drawVisibilityCells(view, overlayContext);
+		if (showCircles        ) OverlayDrawer.drawCircles(view, overlayContext, this::dominanceFor);
+		if (showRays           ) OverlayDrawer.drawRays(view, overlayContext);
+		if (showPoints         ) OverlayDrawer.drawPoints(view, overlayContext);
+		if (showHelp           ) HelpOverlayDrawer.draw(view);
 	}
 
 

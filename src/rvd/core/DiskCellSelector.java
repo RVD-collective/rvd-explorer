@@ -5,7 +5,7 @@ import xyz.marsavic.geometry.Vector;
 
 public class DiskCellSelector {
 
-    public int select(Vector p, Figure[][] dominances, boolean[] enabled, int n) {
+    public static int select(Vector p, Figure[][] dominances, boolean[] enabled, int n) {
         int k = 0;
         while (!enabled[k]) {
             k++;

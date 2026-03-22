@@ -8,7 +8,7 @@ import xyz.marsavic.utils.performance.ArrayInts;
 
 public class PolygonVisibility {
 
-    public int[] visibleVertices(Vector p, Vector[] points, int n, Polygon polygon, boolean polygonMode, boolean showPolygonExterior) {
+    public static int[] visibleVertices(Vector p, Vector[] points, int n, Polygon polygon, boolean polygonMode, boolean showPolygonExterior) {
         ArrayInts vs = new ArrayInts(n);
         for (int k = 0; k < n; k++) {
             if (!polygonMode || visibleThroughPolygon(p, k, points, n, polygon, showPolygonExterior)) {
@@ -18,7 +18,8 @@ public class PolygonVisibility {
         return vs.toArray();
     }
 
-    public boolean visibleThroughPolygon(Vector p, int k, Vector[] points, int n, Polygon polygon, boolean showPolygonExterior) {
+    
+    public static boolean visibleThroughPolygon(Vector p, int k, Vector[] points, int n, Polygon polygon, boolean showPolygonExterior) {
         LineSegment ab = LineSegment.pq(points[k], p);
 
         if (!showPolygonExterior) {

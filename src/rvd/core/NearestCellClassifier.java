@@ -5,11 +5,11 @@ import xyz.marsavic.geometry.Vector;
 
 public class NearestCellClassifier {
 
-    private final RayNearestSelector rayNearestSelector = new RayNearestSelector();
+    private static final RayNearestSelector rayNearestSelector = new RayNearestSelector();
 
     public record Result(int index, int visibleCount, double angle) {}
 
-    public Result classify(
+    public static Result classify(
             Vector p,
             Ray[] rays,
             boolean[] enabled,

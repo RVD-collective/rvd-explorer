@@ -11,7 +11,7 @@ public class DiagramPreparation {
 
     public record PreparedData(Polygon polygon, Ray[] rays, Figure[][] dominanceRegion) {}
 
-    public PreparedData prepare(
+    public static PreparedData prepare(
             Vector[] points,
             double[] angles,
             int n,

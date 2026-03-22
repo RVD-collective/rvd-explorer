@@ -30,7 +30,7 @@ public class OverlayDrawer {
             double pointRadius
     ) {}
 
-    public void drawRays(View view, Context context) {
+    public static void drawRays(View view, Context context) {
         ExplorerState state = context.state();
         view.setLineWidth(context.strokeWidth() * context.pixelWidth());
 
@@ -41,7 +41,7 @@ public class OverlayDrawer {
         }
     }
 
-    public void drawBrocardPoint(View view, Vector brocardPoint, Context context) {
+    public static void drawBrocardPoint(View view, Vector brocardPoint, Context context) {
         if (brocardPoint == null) {
             return;
         }
@@ -49,7 +49,7 @@ public class OverlayDrawer {
         view.fillCircleCentered(brocardPoint, context.pointRadius() * context.pixelWidth());
     }
 
-    public void drawPolygon(View view, Context context) {
+    public static void drawPolygon(View view, Context context) {
         Polygon polygon = context.polygon();
         if (context.showDiagramSkeleton() || polygon == null) {
             return;
@@ -60,7 +60,7 @@ public class OverlayDrawer {
         view.strokePolygon(polygon);
     }
 
-    public void drawVisibilityCells(View view, Context context) {
+    public static void drawVisibilityCells(View view, Context context) {
         Polygon polygon = context.polygon();
         if (!context.polygonMode() || polygon == null) {
             return;
@@ -96,7 +96,7 @@ public class OverlayDrawer {
         }
     }
 
-    public void drawPoints(View view, Context context) {
+    public static void drawPoints(View view, Context context) {
         ExplorerState state = context.state();
         view.setLineWidth(context.strokeWidth() * context.pixelWidth());
 
@@ -109,7 +109,7 @@ public class OverlayDrawer {
         }
     }
 
-    public void drawCircles(
+    public static void drawCircles(
             View view,
             Context context,
             BiFunction<Integer, Integer, Figure> dominanceProvider

@@ -5,7 +5,7 @@ import xyz.marsavic.drawingfx.drawing.View;
 
 public class HelpOverlayDrawer {
 
-    public void draw(View view) {
+    public static void draw(View view) {
         DrawingUtils.drawInfoText(view,
                 "Gadgets:",
                 "    data            - The encoding of the configuration (save/load = copy/paste)",
