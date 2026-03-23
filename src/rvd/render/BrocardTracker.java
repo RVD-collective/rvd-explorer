@@ -8,14 +8,13 @@ public class BrocardTracker {
     private double angle;
 
     public void reset() {
-        angle = 0.0;
+        angle = Double.NEGATIVE_INFINITY;
         point = null;
     }
 
+    /** Renderer-supplied colored-cell argmax; point may be skeleton-snapped. Skips -2 (aperture-clipped) and -3 (out-of-domain). */
     public void observe(int index, double candidateAngle, Vector candidatePoint) {
-        // Preserves legacy sentinel behavior from RVDExplorer:
-        // -1 = skeleton, -2 = aperture-clipped, -3 = out of domain.
-        if (index >= -2 && candidateAngle > angle) {
+        if (index > -2 && candidateAngle > angle) {
             angle = candidateAngle;
             point = candidatePoint;
         }

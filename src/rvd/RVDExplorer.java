@@ -198,6 +198,11 @@ public class RVDExplorer implements Drawing {
 	}
 
 
+	/** Colored cells only — max angle is always taken over these; skeleton mode only snaps the drawn position. */
+	private static boolean isColoredCellForMaxAngle(int index) {
+		return index >= 0;
+	}
+
 	private RVDColor colorDiagram(PointResult ia) {
 		if (ia.i == -1) return RVDColor.BLACK;
 		if (ia.i == -2) return rvdColorBackground;
@@ -327,6 +332,7 @@ public class RVDExplorer implements Drawing {
 		Figure[][] dominanceRegion = prepared.dominanceRegion();
 
 		resetBrocardSearch();
+		boolean trackMaxAngle = diagram != DiagramType.DISK_DIAGRAM;
 		return rasterDiagramRenderer.render(
 				tFromPixels,
 				bImage,
@@ -339,7 +345,10 @@ public class RVDExplorer implements Drawing {
 						classification.visibleCount(),
 						classification.angle()
 				)),
-				(classification, p) -> brocardTracker.observe(classification.index(), classification.angle(), p)
+				(classification, p) -> brocardTracker.observe(classification.index(), classification.angle(), p),
+				trackMaxAngle,
+				RVDExplorer::isColoredCellForMaxAngle,
+				showDiagramSkeleton
 		);
 	}
 

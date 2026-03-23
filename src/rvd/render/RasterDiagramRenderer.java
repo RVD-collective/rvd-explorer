@@ -10,6 +10,7 @@ import xyz.marsavic.geometry.Transformation;
 import xyz.marsavic.geometry.Vector;
 
 import java.nio.IntBuffer;
+import java.util.function.IntPredicate;
 import java.util.stream.IntStream;
 
 public class RasterDiagramRenderer {
@@ -46,7 +47,10 @@ public class RasterDiagramRenderer {
             Box bImage,
             Classifier classifier,
             Colorizer colorizer,
-            Observer observer
+            Observer observer,
+            boolean trackMaxAngleObservation,
+            IntPredicate eligibleColoredForMaxAngle,
+            boolean snapMaxAngleToSkeleton
     ) {
         Vector diag = bImage.d().abs();
         int sizeX = diag.xInt();
@@ -57,8 +61,18 @@ public class RasterDiagramRenderer {
         }
 
         ensureBuffers(sizeX, sizeY);
-        computeNearestPass(tFromPixels, sizeX, sizeY, classifier, observer);
-        computeAntialiasPass(tFromPixels, sizeX, sizeY, classifier, colorizer, observer);
+        computeNearestPass(tFromPixels, sizeX, sizeY, classifier);
+        if (trackMaxAngleObservation) {
+            emitDeterministicMaxAngleObservation(
+                    tFromPixels,
+                    sizeX,
+                    sizeY,
+                    observer,
+                    eligibleColoredForMaxAngle,
+                    snapMaxAngleToSkeleton
+            );
+        }
+        computeAntialiasPass(tFromPixels, sizeX, sizeY, classifier, colorizer);
         return buildWritableImage(sizeX, sizeY);
     }
 
@@ -77,8 +91,7 @@ public class RasterDiagramRenderer {
             Transformation tFromPixels,
             int sizeX,
             int sizeY,
-            Classifier classifier,
-            Observer observer
+            Classifier classifier
     ) {
         IntStream.range(0, sizeY).parallel().forEach(y -> {
             for (int x = 0; x < sizeX; x++) {
@@ -88,9 +101,80 @@ public class RasterDiagramRenderer {
                 bestI[y][x] = (byte) classification.index();
                 bestDepth[y][x] = (byte) classification.visibleCount();
                 bestA[y][x] = (float) classification.angle();
-                observer.observe(classification, p);
             }
         });
+    }
+
+    /**
+     * Argmax angle over colored cells only; tie-break smallest y, then x. When {@code snapMaxAngleToSkeleton},
+     * draws the marker at the skeleton pixel ({@code -1}) closest in world space to that colored optimum
+     */
+    private void emitDeterministicMaxAngleObservation(
+            Transformation tFromPixels,
+            int sizeX,
+            int sizeY,
+            Observer observer,
+            IntPredicate eligibleColoredForMaxAngle,
+            boolean snapMaxAngleToSkeleton
+    ) {
+        double bestAngle = Double.NEGATIVE_INFINITY;
+        int bestX = -1;
+        int bestY = -1;
+
+        for (int y = 0; y < sizeY; y++) {
+            for (int x = 0; x < sizeX; x++) {
+                int i = bestI[y][x];
+                if (!eligibleColoredForMaxAngle.test(i)) {
+                    continue;
+                }
+                double a = bestA[y][x];
+                if (a > bestAngle) {
+                    bestAngle = a;
+                    bestX = x;
+                    bestY = y;
+                }
+            }
+        }
+
+        if (bestX < 0) {
+            return;
+        }
+
+        Vector pColored = tFromPixels.applyTo(Vector.xy(bestX + 0.5, bestY + 0.5));
+
+        int outX = bestX;
+        int outY = bestY;
+        if (snapMaxAngleToSkeleton) {
+            double bestD2 = Double.POSITIVE_INFINITY;
+            int skX = -1;
+            int skY = -1;
+            for (int y = 0; y < sizeY; y++) {
+                for (int x = 0; x < sizeX; x++) {
+                    if (bestI[y][x] != -1) {
+                        continue;
+                    }
+                    Vector pSk = tFromPixels.applyTo(Vector.xy(x + 0.5, y + 0.5));
+                    double d2 = pSk.sub(pColored).lengthSquared();
+                    if (d2 < bestD2) {
+                        bestD2 = d2;
+                        skX = x;
+                        skY = y;
+                    }
+                }
+            }
+            if (skX >= 0) {
+                outX = skX;
+                outY = skY;
+            }
+        }
+
+        Vector p = tFromPixels.applyTo(Vector.xy(outX + 0.5, outY + 0.5));
+        Classification classification = new Classification(
+                bestI[bestY][bestX],
+                bestDepth[bestY][bestX],
+                bestA[bestY][bestX]
+        );
+        observer.observe(classification, p);
     }
 
     private void computeAntialiasPass(
@@ -98,8 +182,7 @@ public class RasterDiagramRenderer {
             int sizeX,
             int sizeY,
             Classifier classifier,
-            Colorizer colorizer,
-            Observer observer
+            Colorizer colorizer
     ) {
         IntStream.range(0, sizeY).parallel().forEach(y -> {
             for (int x = 0; x < sizeX; x++) {
@@ -127,7 +210,6 @@ public class RasterDiagramRenderer {
                         Vector cPixel = Vector.xy(x + (idx + 0.5) / N_VALUES, y + (idy + 0.5) / N_VALUES);
                         Vector p = tFromPixels.applyTo(cPixel);
                         Classification classification = classifier.classify(p);
-                        observer.observe(classification, p);
                         sum = sum.add(colorizer.color(classification));
                     }
                     code = sum.mul(1.0 / N_VALUES).code();
