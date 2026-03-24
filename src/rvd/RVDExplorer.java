@@ -67,15 +67,6 @@ public class RVDExplorer implements Drawing {
 	DiagramType diagram = DiagramType.RVD_RAYS_ORIENTED;
 
 	@GadgetBoolean
-	@Properties(name = "Polygon mode (y)")
-	boolean polygonMode = true;
-
-	@GadgetBoolean
-	@Properties(name = "Edge-aligned polygon rays (i)")
-	boolean brocardIllumination = true;
-
-
-	@GadgetBoolean
 	@Properties(name = "Show diagram (d)")
 	boolean showDiagram = true;
 
@@ -108,7 +99,21 @@ public class RVDExplorer implements Drawing {
 	@Properties(name = "Show circles (c)")
 	boolean showCircles = false;
 
+	@GadgetBoolean
+	@Properties(name = "Snap to grid (g)")
+	boolean snapToGrid = false;
 
+	@GadgetColorPicker
+	@Properties(name = "Background color")
+	Color colorBackground = Color.gray(0.2);
+
+	@GadgetBoolean
+	@Properties(name = "Polygon mode (y)")
+	boolean polygonMode = true;
+
+	@GadgetBoolean
+	@Properties(name = "Edge-aligned rays (a)")
+	boolean brocardIllumination = true;
 
 	@GadgetBoolean
 	@Properties(name = "Show polygon exterior (x)")
@@ -122,26 +127,13 @@ public class RVDExplorer implements Drawing {
 	@Properties(name = "Show visibility cells depth")
 	boolean visibilityCellsShadingCount = true;
 
-
-	@GadgetColorPicker
-	@Properties(name = "Background color")
-	Color colorBackground = Color.gray(0.2);
-
-	@GadgetBoolean
-	@Properties(name = "Snap to grid (g)")
-	boolean snapToGrid = false;
-
-
-
-
-
 	double[] hues = new double[maxN];
 	int kSelected = -1;
 
 	private Polygon polygon;
 
 	RVDColor rvdColorBackground;
-	
+
 	private final BrocardTracker brocardTracker = new BrocardTracker();
 	private final DiagramFrameCoordinator diagramFrameCoordinator = new DiagramFrameCoordinator();
 	private final RasterDiagramRenderer rasterDiagramRenderer = new RasterDiagramRenderer();
@@ -456,7 +448,7 @@ public class RVDExplorer implements Drawing {
 			diagramFrameCoordinator.markDirty();
 		}
 
-		if (inputState.mouseButtonPressed(3) && kSelected >= 0) {
+		if (inputState.mouseButtonPressed(3) && kSelected >= 0 && !(polygonMode && brocardIllumination)) {
 			Vector d = p.sub(this.state.points[kSelected]);
 			this.state.angles[kSelected] = d.angle() - this.state.rotate;
 			diagramFrameCoordinator.markDirty();
@@ -493,7 +485,7 @@ public class RVDExplorer implements Drawing {
 		if (event.isKeyPress(KeyCode.L)) { showColor                ^= true; diagramFrameCoordinator.markDirty(); }
 		if (event.isKeyPress(KeyCode.S)) { showShading              ^= true; diagramFrameCoordinator.markDirty(); }
 		if (event.isKeyPress(KeyCode.Y)) { polygonMode              ^= true; diagramFrameCoordinator.markDirty(); }
-		if (event.isKeyPress(KeyCode.I)) { brocardIllumination      ^= true; diagramFrameCoordinator.markDirty(); }
+		if (event.isKeyPress(KeyCode.A)) { brocardIllumination      ^= true; diagramFrameCoordinator.markDirty(); }
 		if (event.isKeyPress(KeyCode.X)) { showPolygonExterior      ^= true; diagramFrameCoordinator.markDirty(); }
 	}
 
