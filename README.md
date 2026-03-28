@@ -92,3 +92,9 @@ If you change dependencies (JAR names, JavaFX usage, or Java version), update th
 - `images/` — image resources used by the app.
 - `build.gradle`, `settings.gradle`, `gradlew*` — Gradle build and wrapper.
 - `.github/workflows/` — CI and release automation.
+
+## License
+
+**MIT** — see [`LICENSE`](LICENSE). You may use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of this project’s **source code in this repository**, subject to the license terms (including keeping the copyright notice).
+
+The bundled third-party JARs (`drawing-fx-…`, `mars-bits-…`) remain under **their** authors’ licenses; this repo’s MIT license applies to the **rvd-explorer** code here, not to relicensing those libraries.
